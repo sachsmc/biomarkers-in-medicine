@@ -70,7 +70,7 @@ badroc <- data.frame(cbind(c, TPF, FPF))
 boxplot(T ~ D, xlab = "disease status", ylab = "marker value")
 text(1.5, -1.5, "p < .001")
 plot(TPF ~ FPF, badroc, lwd = 2, xlab = "1 - specificity", ylab = "sensitivity", type = 's', xaxp = c(0, 1, 2), yaxp = c(0, 1, 2))
-legend("bottomright", lwd = 2, lty = 1, legend = "Great new marker\n AUC = .79; p < 0.001")
+legend(.55, .2, lwd = 2, lty = 1, legend = "Great new marker\n AUC = .79; p < 0.001 \n", cex = .75)
 ```
 
 ## Evaluating Biomarkers: Practice
@@ -88,17 +88,16 @@ df <- ddply(df, ~ Biomarker, function(d){
 })
 
 ggplot(df, aes(x = Time, y = Survival, color = Biomarker)) + scale_x_continuous(limits = c(0, 10)) +
-  geom_step() + theme_igray() 
+  geom_step(lwd = 1.5) + theme_igray() + annotate("text", 7.5, .1, label = "* p < 0.001")
 
 ```
-* p < 0.001
 
 
 ## Evaluating Biomarkers: Practice
 
 ```{r plot1, echo = FALSE, fig.align='center', warning=FALSE}
 
-df <- data.frame(Time = c(rexp(50, .1), rexp(50, 2), rexp(50, 4), rexp(50, 3)), 
+df <- data.frame(Time = c(rexp(50, .1), rexp(50, 1), rexp(50, .9), rexp(50, 1.5)), 
                  Biomarker = c(rep("Below median", 100), rep("Above median", 100)), 
                  Treatment = rep(c(rep("Experimental", 50), rep("Placebo", 50)), 2))
 
@@ -108,12 +107,12 @@ df <- ddply(df, ~ Biomarker + Treatment, function(d){
   
 })
 
-ggplot(df, aes(x = Time, y = Survival, color = Treatment)) + scale_x_continuous(limits = c(0, 10)) +
-  geom_step() + theme_igray() + scale_color_colorblind() + facet_wrap(~Biomarker)
+ann.text <- data.frame(Time = 4, Survival = 1, Treatment = "Experimental", Biomarker = c("Below median", "Above median"), label = c("p < 0.001", "p = 0.28"))
+
+ggplot(df, aes(x = Time, y = Survival, color = Treatment)) + scale_x_continuous(limits = c(0, 5)) +
+  geom_step() + theme_igray() + scale_color_colorblind() + 
+  geom_text(data = ann.text, aes(label = label), color = "black") + facet_wrap(~Biomarker)
 ```
-* p < 0.001
-
-
 
 ## Evaluating Biomarkers: Theory
 
@@ -134,7 +133,7 @@ Search results from Google scholar restricted to journals: _Statistics in Medici
 
 - Mathematical Statistician at the NCI
     + Review biomarker-related aspects of cancer clinical trials
-    + Collaborate with other programs across the NCI
+    + Collaborate with other programs across the NCI and NIH
     + Conduct research in Biostatistics
 
 Disease areas: 
@@ -281,9 +280,40 @@ $$ \frac{Pr\{M = 1 \mbox{ AND } D = 1\}}{Pr\{D = 1\}} = \frac{Pr\{D = 1 | M = 1\
 What if the test yields a continuous measurement?
 
 ```{r mamm, echo = FALSE, warning = FALSE, message = FALSE}
-contex <- data.frame(Result = c(exp(rnorm(250, sd = .5)), rbinom(250, 1, .15)), Test = c(rep("Prostate specific antigen", 250), rep("Mammogram", 250)))
+onc <- read.csv("nki-oncotype-data-2015-02-27.csv", stringsAsFactors = FALSE)
+
+onc$o4 <- onc$oncotypedx
+onc$o4[onc$oncotypedx == 100] <- onc$oncotypedx[onc$oncotypedx == 100] - rexp(sum(onc$oncotypedx == 100), 3.5)
+onc$o4[onc$oncotypedx == 0] <- onc$oncotypedx[onc$oncotypedx == 0] + rexp(sum(onc$oncotypedx == 0), 3.5)
+
+onc$oncotypedx <- onc$o4
+
+onc$d.5year <- with(onc, t.rfs < 365.25 * 5 & e.rfs == 1)
+onc$d.5year[with(onc, t.rfs < 365.25 * 5 & e.rfs == 0)] <- NA
+onc$riskmedian <- onc$oncotypedx > median(onc$oncotypedx)
+
+contex <- data.frame(Result = c(onc$oncotypedx, rbinom(250, 1, .15)), Test = c(rep("Oncotype DX score", 329), rep("Mammogram", 250)))
 ggplot(contex, aes(x = Result)) + geom_bar(stat = "bin") + facet_wrap(~ Test, scales = "free") + theme_igray() + scale_color_colorblind()
 ```
+
+## Oncotype DX
+
+- Risk score for recurrence of breast cancer
+- Based on expression of a panel of 21 genes
+- Measured using RT-PCR on archival tumor specimens
+- Example data (n = 207) from a clinical case series in the Netherlands
+- Outcome is recurrence within 5 years
+
+```{r oncsurv, echo = FALSE, fig.width = 4.25, fig.height = 2.5}
+par(mar = c(4, 4, 2, 1), cex = .75)
+plot(survfit(Surv(t.rfs, e.rfs) ~ 1, data = onc), xscale = 365.25, mark.time = FALSE, conf.int = FALSE, lwd = 2, xlab = "Years post-surgery", ylab = "RFS")
+abline(v = c(2, 5, 10), h = seq(0, 1, by = .1), col = "grey80")
+
+plot(survfit(Surv(t.os, e.os) ~ 1, data = onc), xscale = 365.25, mark.time = FALSE, conf.int = FALSE, lwd = 2, xlab = "Years post-surgery", ylab = "OS")
+abline(v = c(2, 5, 10), h = seq(0, 1, by = .2), col = "grey80")
+```
+
+References: [Paik et al., 2004](http://www.nejm.org/doi/full/10.1056/NEJMoa041588), [van de Vijver et al., 2002](http://www.nejm.org/doi/full/10.1056/nejmoa021967), [van't Veer et al., 2002](http://www.nature.com/nature/journal/v415/n6871/full/415530a.html)
 
 ## Solutions
 
@@ -316,13 +346,15 @@ A short review of the oncology literature suggests
 
 ```{r rocci, echo = 1, results = 'asis', fig.keep = 'none', fig.align = 'center'}
 library(plotROC)
-D.ex <- rbinom(250, size = 1, prob = .5)
-M.ex <- rnorm(250, mean = D.ex)
+onc.sub <- subset(onc, !is.na(d.5year))
+
+D.ex <- onc.sub$d.5year
+M.ex <- onc.sub$oncotypedx
 
 roc.ci <- calculate_roc(M.ex, D.ex, ci = TRUE, alpha = 0.05)
-ci.rocplot <- ggroc(roc.ci, label = "Marker A", ci = TRUE)
+ci.rocplot <- ggroc(roc.ci, label = "Oncotype DX", ci = TRUE)
 cat(
-  export_interactive_roc(ci.rocplot, 
+  export_interactive_roc(ci.rocplot + theme_igray(), 
                          prefix = "aci")
   )
 ```
@@ -333,7 +365,7 @@ See http://sachsmc.github.io/plotROC for usage and examples
 
 ```{r printci, fig.align = "center", echo = FALSE, fig.height = 5, fig.width = 5}
 plot_journal_roc(ci.rocplot, n.cuts = 10, 
-                 ci.at = c(-.5, .5, 2.1))
+                 ci.at = c(25, 50, 75))
 ```
 
 ## Extension 2
@@ -345,8 +377,8 @@ plot_journal_roc(ci.rocplot, n.cuts = 10,
   
 ```{r surv, fig.height = 3, fig.width = 5, echo = FALSE, fig.align = 'center'}
 ggplot(data.frame(T = sort(exp(rnorm(100, mean = 1, sd = .2)))), aes(x = T, y = 1 - seq_along(T)/100)) + geom_step() + 
-  scale_x_continuous("Time to progression") +
-  scale_y_continuous("Proportion progression free") + theme_igray()
+  scale_x_continuous("Time since surgery") +
+  scale_y_continuous("Proportion without distant recurrence") + theme_igray()
 ```
   
 ## Solutions
@@ -373,22 +405,25 @@ See [Heagerty, Lumley, Pepe, 2000](http://onlinelibrary.wiley.com/doi/10.1111/j.
 ## The plot
 Show curves for a small subset of event times:
 <div class="columns-2">
-```{r survget, echo = FALSE, warning = FALSE, message = FALSE, results = 'asis', fig.keep = 'none', fig.width = 5, fig.height = 4}
+```{r survget, echo = FALSE, warning = FALSE, message = FALSE, results = 'asis', fig.keep = 'none', fig.width = 5, fig.height = 5}
 library(survivalROC)
 library(survival)
 set.seed(320)
-survT <- rexp(550, 1/3)
-cens <- rbinom(550, 1, .35)
 
-M <- 10 * (survT)^(-1/3) + rnorm(550, sd = survT*.6)
+onc.sub2 <- subset(onc, !is.na(t.rfs))
+survT <- onc.sub2$t.rfs/365.25
+cens <- onc.sub2$e.rfs
 
-marker <- factor(M < median(M), labels = c("above median", "below median"))
+M <- onc.sub2$oncotypedx
 
-sfit <- survfit(Surv(survT, cens) ~ marker)
+oncotypeDX <- factor(M < median(M), labels = c("above median", "below median"))
+
+sfit <- survfit(Surv(survT, cens) ~ oncotypeDX)
 ```
 
-```{r surv2, echo = FALSE, warning = FALSE, fig.width = 5, fig.height = 5}
-ggkm(sfit, timeby = 10) + scale_x_continuous(limits = c(0, 18)) + theme_igray() + theme(legend.position = c(.75, .75))
+```{r surv2, echo = FALSE, warning = FALSE, message = FALSE, fig.width = 4.5, fig.height = 4.5}
+ggkm(sfit) + scale_x_continuous("Time since surgery") + theme_igray() + 
+  theme(legend.position = c(.75, .25)) + scale_y_continuous("Proportion without distant recurrence", limits = c(0, 1))
 ```
 
 
@@ -398,16 +433,22 @@ sroc <- lapply(c(2, 5, 10), function(t){
   data.frame(TPF = stroc$TP, FPF = stroc$FP, c = stroc$cut.values, time = rep(stroc$predict.time, length(stroc$FP)))
   })
 
+
 names(sroc) <- c("2 years", "5 years", "10 years")
 colorplot <- multi_ggroc(sroc, 
                          xlabel = "1 - Specificity", 
                          ylabel = "Sensitivity",
-                         label = c("2 years", "5 years", "10 years")
+                         label = names(sroc), 
+                         label.adj.x = c(-.2, -.1, 0), 
+                         label.adj.y = c(0, 0, 0), legend = TRUE,
                          ) + theme_igray() + geom_abline(slope = 1, intercept = 0, color = "grey80")
+
+
+
 cat(
   export_interactive_roc(colorplot, lty = rep(1, 3), prefix = "multi3",
                          color = c("black", "purple", "orange"), 
-                         legend = FALSE)
+                         legend = TRUE)
   )
 ```
 </div>
@@ -471,16 +512,16 @@ In the presence of low risk/high risk thresholds, calculate partial summary stat
 
 ```{r psum, fig.width = 4, fig.height = 4, fig.align = 'center', echo = FALSE}
 library(predcurver)
-M.ex <- rnorm(250)
-D.ex <- rbinom(250, 1, pnorm(-2 + 3 * M.ex))
+M.ex <- onc.sub$oncotypedx
+D.ex <- onc.sub$d.5year
 
 rho <- predict(glm(D.ex ~ M.ex, family = binomial), type = "response")
 pr <- predcurve(rho)
 
-xxx <- pr$percentile[pr$percentile < .3]
+xxx <- pr$percentile[pr$percentile < .25]
 xxx <- c(xxx, xxx[length(xxx)], rev(xxx))
 
-yyy <- pr$risk[pr$percentile < .3]
+yyy <- pr$risk[pr$percentile < .25]
 yyy <- c(yyy, rep(mean(D.ex), length(yyy) + 1))
 
 xxx2 <- pr$percentile[pr$percentile > .75]
@@ -491,6 +532,8 @@ yyy2 <- c(yyy2, rep(mean(D.ex), length(yyy2) + 1))
 
 
 ggplot(pr, aes(x = percentile, y = risk)) + geom_line() + 
+  scale_y_continuous("Risk 5 year recurrence", limits = c(0, 1)) + 
+  scale_x_continuous("Oncotype DX percentile") + 
   geom_hline(yintercept = mean(D.ex), linetype = 2) + theme_igray() + 
   geom_polygon(data = data.frame(xxx, yyy), aes(x = xxx, y = yyy), alpha = .5) + 
   geom_polygon(data = data.frame(xxx2, yyy2), aes(x = xxx2, y = yyy2), alpha = .5)
@@ -524,11 +567,11 @@ Purpose of a surrogate biomarker is to predict the likely treatment effect on a 
 library(DiagrammeR)
 diagram <- "
 graph LR
-  A[Treatment]-->B[Surrogate]
-  A[Treatment]-->C[Outcome]
-  B[Surrogate]-->C[Outcome]
-"
+  A(Treatment    .)-->B(Surrogate    .)
+  A(Treatment    .)-->C(Outcome    .)
+  B(Surrogate    .)-->C(Outcome    .)
 
+"
 mermaid(diagram)
 ```
 
@@ -579,12 +622,21 @@ tg <- c(.65 - .05 * time + .025 * (time - 7) * (time > 7), .25 - .01 * time)
 ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Good", 250), rep("Bad", 250))), 
        aes(x = time, y = tg, linetype = Surrogate)) + 
   geom_line() + scale_y_continuous("Total Gain", limits = c(0, 1)) + 
-  scale_x_continuous("Time since surrogate measurement")
+  scale_x_continuous("Time since surrogate measurement") + theme_igray()
 ```
 
 # Conclusion
 
 ## 
 
-- What
+- Methods and tools to comprehensively evaluate biomarkers of all types
+- Seeing the data and statistics that researchers care about
+- Arbitrary cutoffs and p-value thresholds hinder accumulation of knowledge
+- Embrace new technologies to make these tools available to the scientific community
+
+Presentation and source files available at 
+
+http://github.com/sachsmc/biomarkers-in-medicine
+
+**Thank you!**
 
