@@ -1,4 +1,7 @@
-Markers in Cancer
+Evaluating Biomarkers in Medicine: Methods and Practice
 ----------------
 
-Slides for a presentation on statistical methods for evaluating biomarkers for diagnosis, prognosis, and surrogates. 
+Abstract goes here
+
+http://sachsmc.github.io/biomarkers-in-medicine
+
