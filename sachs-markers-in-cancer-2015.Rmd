@@ -1,7 +1,7 @@
 ---
 title: "Evaluating Biomarkers in Medicine: Methods and Practice"
 author: "Michael Sachs"
-date: "`r format(Sys.Date(), '%B %d, %Y')`"
+date: March 6, 2015
 output: 
   ioslides_presentation:
     self_contained: true
@@ -578,8 +578,8 @@ mermaid(diagram)
 ## Example: Herpes Zoster
 
 - Phase III randomized trial of Zoster vaccine vs placebo in 22,439 North American/European people aged 50-59
-- Antibodies to vaccine (titers) measured in blood post-randomization in a case-control sampling plan
 - Vaccine highly effective: VE = 70% (95% CI: 54% to 81%)
+- Antibodies to vaccine (titers) measured in blood post-randomization in a case-control substudy
 - Possible correlates of protection: 
     + Titers at week 6
     + Fold change in Titers from baseline
@@ -645,8 +645,8 @@ ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Log differen
 ## 
 
 - Methods and tools to comprehensively evaluate biomarkers of all types
-- Seeing the data and statistics that researchers care about
-- Arbitrary cutoffs and p-value thresholds hinder accumulation of knowledge
+- Frame and visualize the data and statistics that researchers care about
+- Arbitrary cutoffs and p-value thresholds hinder accumulation of knowledge and the interpretation of biomarkers
 - Embrace new technologies to make these tools available to the scientific community
 
 ### **Thank you!**
