@@ -4,7 +4,7 @@ author: "Michael Sachs"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output: 
   ioslides_presentation:
-    self_contained: false
+    self_contained: true
     widescreen: true
     fig_width: 8
     fig_height: 4
@@ -14,7 +14,7 @@ output:
 
 # Introduction
 
-## Evaluating Biomarkers: Practice
+## Evaluating Biomarkers: (Bad) Practice
 
 ```{r libs, include = FALSE}
 library(ggplot2)
@@ -73,7 +73,7 @@ plot(TPF ~ FPF, badroc, lwd = 2, xlab = "1 - specificity", ylab = "sensitivity",
 legend(.55, .2, lwd = 2, lty = 1, legend = "Great new marker\n AUC = .79; p < 0.001 \n", cex = .75)
 ```
 
-## Evaluating Biomarkers: Practice
+## Evaluating Biomarkers: (Bad) Practice
 
 ```{r plot2, echo = FALSE, fig.width = 6, fig.align = 'center', warning = FALSE}
 df <- data.frame(Time = c(rexp(50, .1), rexp(50, 2), rexp(50, 4), rexp(50, 3)), 
@@ -93,7 +93,7 @@ ggplot(df, aes(x = Time, y = Survival, color = Biomarker)) + scale_x_continuous(
 ```
 
 
-## Evaluating Biomarkers: Practice
+## Evaluating Biomarkers: (Bad) Practice
 
 ```{r plot1, echo = FALSE, fig.align='center', warning=FALSE}
 
@@ -352,7 +352,7 @@ D.ex <- onc.sub$d.5year
 M.ex <- onc.sub$oncotypedx
 
 roc.ci <- calculate_roc(M.ex, D.ex, ci = TRUE, alpha = 0.05)
-ci.rocplot <- ggroc(roc.ci, label = "Oncotype DX", ci = TRUE)
+ci.rocplot <- ggroc(roc.ci, label = "Oncotype DX", ci = TRUE, label.adj.x = .05)
 cat(
   export_interactive_roc(ci.rocplot + theme_igray(), 
                          prefix = "aci")
@@ -567,13 +567,26 @@ Purpose of a surrogate biomarker is to predict the likely treatment effect on a 
 library(DiagrammeR)
 diagram <- "
 graph LR
-  A(Treatment    .)-->B(Surrogate    .)
+  A(Treatment    .)-->B(Surrogate   .)
   A(Treatment    .)-->C(Outcome    .)
   B(Surrogate    .)-->C(Outcome    .)
 
 "
 mermaid(diagram)
 ```
+
+## Example: Herpes Zoster
+
+- Phase III randomized trial of Zoster vaccine vs placebo in 22,439 North American/European people aged 50-59
+- Antibodies to vaccine (titers) measured in blood post-randomization in a case-control sampling plan
+- Vaccine highly effective: VE = 70% (95% CI: 54% to 81%)
+- Possible correlates of protection: 
+    + Titers at week 6
+    + Fold change in Titers from baseline
+- Vaccine efficacy as function of biomarker
+    
+Reference: [Gilbert, Gabriel, et al, 2014](http://jid.oxfordjournals.org/content/210/10/1573.short)
+
 
 ## Modeling approaches
 
@@ -584,6 +597,8 @@ $$ Pr\{T < t(0) | M = m(1)\} - Pr\{T < t(0) | M = m(1)\}, $$
 $=$ the conditional risk difference, where $t(0)$ is the event time under placebo and $t(1)$ is event time under active treatment 
 
 - Some assumptions and special methods allow for estimation of causal effects
+- For a given subject, can only observe either $t(0)$ or $t(1)$, never both
+- Principal stratification, counterfactuals
 
 
 
@@ -599,12 +614,12 @@ rho2 <- predict(glm(D.ex ~ M2.ex, family = binomial), type = "response")
 pr <- predcurve(rho)
 pr2 <- predcurve(rho2)
 
-pr$Surrogate <- "Good"
-pr2$Surrogate <- "Bad"
+pr$Surrogate <- "Log difference in Titers"
+pr2$Surrogate <- "Titers at week 6"
 
 ggplot(rbind(pr, pr2), aes(x = percentile, y = risk, linetype = Surrogate)) + geom_line() + 
   geom_hline(yintercept = mean(D.ex), linetype = 2) + theme_igray() + 
-  theme(legend.position=c(.25, .85)) + scale_y_continuous("Risk difference (treatment efficacy)") + 
+  theme(legend.position=c(.25, .85)) + scale_y_continuous("Risk difference (vaccine efficacy)") + 
   scale_x_continuous("Surrogate percentile on treatment")
 ```
 
@@ -619,7 +634,7 @@ ggplot(rbind(pr, pr2), aes(x = percentile, y = risk, linetype = Surrogate)) + ge
 time <- sort(runif(250 ,0, 10))
 tg <- c(.65 - .05 * time + .025 * (time - 7) * (time > 7), .25 - .01 * time)
 
-ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Good", 250), rep("Bad", 250))), 
+ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Log difference in Titers", 250), rep("Titers at week 6", 250))), 
        aes(x = time, y = tg, linetype = Surrogate)) + 
   geom_line() + scale_y_continuous("Total Gain", limits = c(0, 1)) + 
   scale_x_continuous("Time since surrogate measurement") + theme_igray()
@@ -634,9 +649,10 @@ ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Good", 250),
 - Arbitrary cutoffs and p-value thresholds hinder accumulation of knowledge
 - Embrace new technologies to make these tools available to the scientific community
 
+### **Thank you!**
+
 Presentation and source files available at 
 
 http://github.com/sachsmc/biomarkers-in-medicine
 
-**Thank you!**
 
