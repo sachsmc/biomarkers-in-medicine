@@ -592,12 +592,12 @@ Reference: [Gilbert, Gabriel, et al, 2014](http://jid.oxfordjournals.org/content
 
 - As before, interested in prospective measure, but this time **treatment-specific**: 
 
-$$ Pr\{T < t(0) | M = m(1)\} - Pr\{T < t(0) | M = m(1)\}, $$
+$$ Pr\{T(0) < t | M(1) = m\} - Pr\{T(1) < t | M(1) = m\}, $$
 
-$=$ the conditional risk difference, where $t(0)$ is the event time under placebo and $t(1)$ is event time under active treatment 
+$=$ the conditional risk difference, where $T(0)$ is the event time under placebo and $T(1)$ is event time under active treatment and $M(1)$ is the post-treatment biomarker value
 
 - Some assumptions and special methods allow for estimation of causal effects
-- For a given subject, can only observe either $t(0)$ or $t(1)$, never both
+- For a given subject, can only observe either $T(0)$ or $T(1)$, never both
 - Principal stratification, counterfactuals
 
 
