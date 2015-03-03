@@ -747,7 +747,7 @@ ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Log differen
 
 ### **Thank you!**
 
-Presentation and source files available at 
+Slides and source files available at 
 
 http://github.com/sachsmc/biomarkers-in-medicine
 
