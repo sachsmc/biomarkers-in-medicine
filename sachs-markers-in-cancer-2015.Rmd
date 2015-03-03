@@ -23,6 +23,9 @@ library(ggthemes)
 library(survival)
 library(survivalROC)
 library(plotROC)
+library(magrittr)
+library(dplyr)
+
 
 ggkm <- function(sfit, xlabs = "Time since marker measured", ylabs = "survival probability", 
                  ystratalabs = NULL, ystrataname = NULL, timeby = 100, 
@@ -70,7 +73,7 @@ badroc <- data.frame(cbind(c, TPF, FPF))
 boxplot(T ~ D, xlab = "disease status", ylab = "marker value")
 text(1.5, -1.5, "p < .001")
 plot(TPF ~ FPF, badroc, lwd = 2, xlab = "1 - specificity", ylab = "sensitivity", type = 's', xaxp = c(0, 1, 2), yaxp = c(0, 1, 2))
-legend(.55, .2, lwd = 2, lty = 1, legend = "Great new marker\n AUC = .79; p < 0.001 \n", cex = .75)
+legend(.5, .2, lwd = 2, lty = 1, legend = "Great new marker\n AUC = .79; p < 0.001 \n", cex = .75)
 ```
 
 ## Evaluating Biomarkers: (Bad) Practice
@@ -249,7 +252,7 @@ $$ TPF = Pr\{\mbox{Marker positive} | \mbox{Has condition} \} = Pr\{M = 1 | D = 
 
 $$ FPF = Pr\{M = 1 | D = 0 \} $$ 
 
-Ideal: TPF = 1, FPF = 0; Bad: TPF = FPF
+Ideal: TPF = 1, FPF = 0; Useless: TPF = FPF
 
 **Predictions**
 
@@ -317,7 +320,7 @@ References: [Paik et al., 2004](http://www.nejm.org/doi/full/10.1056/NEJMoa04158
 
 ## Solutions
 
-### Goal is to assess accuracy using the aforementioned measures
+### Goal is to assess classification accuracy using the FPF and TPF
 
 > - Pick an arbitrary cutoff, say $c$. 
 > - Now *test positive* is defined as $M > c$
@@ -372,7 +375,7 @@ plot_journal_roc(ci.rocplot, n.cuts = 10,
 
   - Binary outcome, good for diagnosis, screening
   - What about prognostic/predictive biomarkers?
-  - Outcome of interest is *time to event*, i.e. PFS or OS
+  - Outcome of interest is *time to event*, i.e. PFS or OS, since recision surgery
   - Instead of $D = 1$ we have $T > t$
   
 ```{r surv, fig.height = 3, fig.width = 5, echo = FALSE, fig.align = 'center'}
@@ -507,10 +510,9 @@ Amount of spread in the vertical axis
 
 - Quantify the steepness of the predictiveness curve
 - Allow for hypothesis testing, comparison of biomarkers
+- If high-risk or low-risk thresholds exists, calculate partial summary measures by integrating over a restricted range: 
 
-In the presence of low risk/high risk thresholds, calculate partial summary statistics, i.e.
-
-```{r psum, fig.width = 4, fig.height = 4, fig.align = 'center', echo = FALSE}
+```{r psum, fig.width = 4, fig.height = 3.5, fig.align = 'center', echo = FALSE}
 library(predcurver)
 M.ex <- onc.sub$oncotypedx
 D.ex <- onc.sub$d.5year
@@ -553,7 +555,100 @@ Easy-to-use `R` class for estimation, testing, summarizing, and plotting.
 
 See [Sachs and Zhou, 2013](http://onlinelibrary.wiley.com/doi/10.1002/bimj.201200146/) for more details
 
-[Janes et al. 2014](http://www.ncbi.nlm.nih.gov/pubmed/24695044) for extentions to biomarkers for treatment selection
+## Treatment selection
+
+- Say we have a targeted therapy $T$ such that patients with large $M$ are expected to respond, while those with small $M$ are not expected to respond 
+- [Janes et al. 2014](http://www.ncbi.nlm.nih.gov/pubmed/24695044) extend the concept of the predictiveness curve
+- Instead of $Pr\{D = 1 | M = m\}$, plot $M$ versus both
+
+$$ Pr\{D = 1 | M = m, T = 0\} \mbox{ and } Pr\{D = 1 | M = m, T = 1\} $$ 
+
+This shows how the treatment efficacy varies as a function of $M$. Can also show risk difference or ratio for time-to-event outcomes
+
+```{r eval = FALSE}
+library(TreatmentSelection)
+```
+
+## Treatment selection
+
+```{r trtsel, include = FALSE}
+set.seed(420)
+
+signature <- c(rnorm(600, mean = 3.5), rnorm(600, mean = 5.5))
+treatment <- rbinom(1200, 1, .5)
+time <- rexp(1200, rate = exp(-1.5 - .1 * treatment - .05 * signature -
+                                .35 * treatment * signature * I(signature > 6)))
+
+event <- rbinom(1200, 1, .9)
+event[time > 10] <- 0
+
+set <- data.frame(signature, treatment, time, event, benefit = signature > median(signature))
+
+stratified_survival <- set %>% group_by(benefit) %>%
+  do({
+    survfit(Surv(time, event) ~ treatment, data = .) %>%
+    summary %$%
+    data.frame(time, survival = surv, strata, lower, upper)
+  })
+
+benlabeler <- function(variable, value){
+
+  ifelse(!value, "No benefit", "Benefit")
+
+}
+
+
+set$surv4year <- with(set, time < 6)
+
+strat_risk <- set %>% group_by(benefit, treatment) %>%
+  do({
+    btest <- with(., binom.test(sum(event), sum(!is.na(event))))
+    data.frame(est = btest$estimate, lower = btest$conf.int[1], upper = btest$conf.int[2])
+  })
+
+strat_risk$prediction <- factor(strat_risk$benefit, levels = c(FALSE, TRUE),
+                                labels = c("Low", "High"))
+strat_risk$strata <- factor(strat_risk$treatment, levels = 0:1, labels = c("treatment=0", "treatment=1"))
+
+p2 <- ggplot(strat_risk, aes(x = prediction,
+                             y = est, ymin = lower, ymax = upper,
+                       linetype = strata, shape = strata)) +
+  geom_point(size = 2) + geom_errorbar(width = .2) + scale_x_continuous("Biomarker")
+  scale_y_continuous("5 year event rate") + theme_igray() 
+
+#p2
+
+library(TreatmentSelection)
+
+set$eventnum <- as.numeric(set$event)
+set$strata <- factor(set$treatment, levels = 0:1, labels = c("treatment=0", "treatment=1"))
+
+cont_risk <- trtsel(event = "eventnum",
+       trt = "treatment",
+       marker = "signature",
+       data = set,
+       study.design = "randomized cohort",
+       link = "logit",
+       default.trt = "trt all")
+
+p3 <- plot(cont_risk, conf.bands = FALSE, trt.names = c("treatment=1", "treatment=0"), xlab = "Signature percentile",
+     ylab = "5 year event rate", ylim = c(0, 1), main = "")$plot +
+  scale_linetype_discrete("strata", breaks = 0:1, labels = c("treatment=0", "treatment=1")) +
+  theme_igray()
+
+p3a <- plot(cont_risk, conf.bands = FALSE, plot.type = "treatment effect", trt.names = c("treatment=1", "treatment=0"), xlab = "Signature percentile",
+     main = "")$plot +
+  theme_igray()
+
+```
+
+```{r trtplot2, fig.width = 5, fig.height = 4, echo = FALSE, out.extra='style="float:left"'}
+p3
+```
+
+```{r trtplot2a, fig.width = 5, fig.height = 4, echo = FALSE, out.extra='style="float:left"'}
+p3a
+```
 
 # Surrogate endpoints
 
@@ -599,6 +694,7 @@ $=$ the conditional risk difference, where $T(0)$ is the event time under placeb
 - Some assumptions and special methods allow for estimation of causal effects
 - For a given subject, can only observe either $T(0)$ or $T(1)$, never both
 - Principal stratification, counterfactuals
+- $M(1)$ either observed or estimated using clever study designs and models. See [Follmann 2006](http://onlinelibrary.wiley.com/doi/10.1111/j.1541-0420.2006.00569.x/full)
 
 
 
@@ -625,7 +721,7 @@ ggplot(rbind(pr, pr2), aes(x = percentile, y = risk, linetype = Surrogate)) + ge
 
 ## Details
 
-- [Gabriel et al. 2015](http://onlinelibrary.wiley.com/doi/10.1002/sim.6349/) use a novel Weibull model to estimate causal risks in the time-to-event setting. 
+- [Gabriel et al. 2015](http://onlinelibrary.wiley.com/doi/10.1002/sim.6349/) describe ways to assess accuracy for estimating causal risks in the time-to-event setting. 
     + Transformations to get retrospective summaries, $TPF$ and $FPF$. 
     + Also summary statistics such as $TG$ and $PEV$ to compare surrogates
 - Flexible model that allows for time variation in hazard and treatment effect
@@ -642,7 +738,7 @@ ggplot(data.frame(time = c(time, time), tg = tg, Surrogate = c(rep("Log differen
 
 # Conclusion
 
-## 
+## Summary
 
 - Methods and tools to comprehensively evaluate biomarkers of all types
 - Frame and visualize the data and statistics that researchers care about
